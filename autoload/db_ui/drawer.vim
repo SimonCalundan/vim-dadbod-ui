@@ -461,8 +461,9 @@ function! s:drawer.render_routines(routines, db, path, level, routine_type) abor
   if !a:routines.expanded
     return
   endif
+  let routine_icon = get(g:db_ui_icons, 'routines', get(g:db_ui_icons, 'tables', ''))
   for routine in a:routines.list
-    call self.add(routine, 'open', a:path.'->'.routine, g:db_ui_icons.routines, a:db.key_name, a:level, {'routine': routine, 'routine_type': a:routine_type})
+    call self.add(routine, 'open', a:path.'->'.routine, routine_icon, a:db.key_name, a:level, {'routine': routine, 'routine_type': a:routine_type})
   endfor
 endfunction
 

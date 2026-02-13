@@ -31,16 +31,37 @@ function! s:query.open(item, edit_action) abort
     return self.open_buffer(db, a:item.file_path, a:edit_action)
   endif
   let label = get(a:item, 'label', '')
-  let table = ''
-  let schema = ''
-  if a:item.type !=? 'query'
-    let suffix = a:item.table.'-'.a:item.label
-    let table = a:item.table
-    let schema = a:item.schema
+  let table = get(a:item, 'table', '')
+  let schema = get(a:item, 'schema', '')
+  let content = get(a:item, 'content', '')
+
+  if a:item.type ==? 'query'
+    let content = g:db_ui_default_query
   endif
 
-  let buffer_name = self.generate_buffer_name(db, { 'schema': schema, 'table': table, 'label': label, 'filetype': db.filetype })
-  call self.open_buffer(db, buffer_name, a:edit_action, {'table': table, 'content': get(a:item, 'content'), 'schema': schema })
+  if has_key(a:item, 'routine')
+    let table = a:item.routine
+    let routine_type = get(a:item, 'routine_type', '')
+    if routine_type ==? 'PROCEDURE'
+      let label = 'procedure'
+      let content = 'SHOW CREATE PROCEDURE {optional_schema}{table};'
+    elseif routine_type ==? 'FUNCTION'
+      let label = 'function'
+      let content = 'SHOW CREATE FUNCTION {optional_schema}{table};'
+    endif
+  elseif has_key(a:item, 'event')
+    let table = a:item.event
+    let label = 'event'
+    let content = 'SHOW CREATE EVENT {optional_schema}{table};'
+  endif
+
+  let buffer_name = self.generate_buffer_name(db, {
+        \ 'schema': schema,
+        \ 'table': table,
+        \ 'label': label,
+        \ 'filetype': db.filetype,
+        \ })
+  call self.open_buffer(db, buffer_name, a:edit_action, {'table': table, 'content': content, 'schema': schema })
 endfunction
 
 function! s:query.generate_buffer_name(db, opts) abort
