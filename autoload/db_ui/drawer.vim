@@ -457,6 +457,24 @@ function! s:drawer.render_tables(tables, db, path, level, schema) abort
   endfor
 endfunction
 
+function! s:drawer.render_routines(routines, db, path, level, routine_type) abort
+  if !a:routines.expanded
+    return
+  endif
+  for routine in a:routines.list
+    call self.add(routine, 'open', a:path.'->'.routine, g:db_ui_icons.routines, a:db.key_name, a:level, {'routine': routine, 'routine_type': a:routine_type})
+  endfor
+endfunction
+
+function! s:drawer.render_events(events, db, path, level) abort
+  if !a:events.expanded
+    return
+  endif
+  for event in a:events.list
+    call self.add(event, 'open', a:path.'->'.event, g:db_ui_icons.events, a:db.key_name, a:level, {'event': event})
+  endfor
+endfunction
+
 function! s:drawer.toggle_line(edit_action) abort
   let item = self.get_current_item()
   if item.action ==? 'noaction'
@@ -587,30 +605,76 @@ endfunction
 
 function! s:drawer.populate_tables(db) abort
   let a:db.tables.list = []
+  
+  " Initialize structures for views, procedures, functions, events
+  if !has_key(a:db, 'views')
+    let a:db.views = {'expanded': 0, 'list': [], 'items': {}}
+  endif
+  if !has_key(a:db, 'procedures')
+    let a:db.procedures = {'expanded': 0, 'list': [], 'items': {}}
+  endif
+  if !has_key(a:db, 'functions')
+    let a:db.functions = {'expanded': 0, 'list': [], 'items': {}}
+  endif
+  if !has_key(a:db, 'events')
+    let a:db.events = {'expanded': 0, 'list': [], 'items': {}}
+  endif
+  
   if empty(a:db.conn)
     return a:db
   endif
 
+  " Get tables
   let tables = db#adapter#call(a:db.conn, 'tables', [a:db.conn], [])
-
   let a:db.tables.list = tables
+  
   " Fix issue with sqlite tables listing as strings with spaces
   if a:db.scheme =~? '^sqlite' && len(a:db.tables.list) >=? 0
     let temp_table_list = []
-
     for table_index in a:db.tables.list
       let temp_table_list += map(split(copy(table_index)), 'trim(v:val)')
     endfor
-
     let a:db.tables.list = sort(temp_table_list)
   endif
 
   if a:db.scheme =~? '^mysql'
     call filter(a:db.tables.list, 'v:val !~? "mysql: [Warning\\]" && v:val !~? "Tables_in_"')
+    
+    " Get views
+    let a:db.views.list = db#adapter#call(a:db.conn, 'views', [a:db.conn], [])
+    call self.populate_table_items(a:db.views)
+    
+    " Get procedures
+    let a:db.procedures.list = db#adapter#call(a:db.conn, 'procedures', [a:db.conn], [])
+    call self.populate_routine_items(a:db.procedures)
+    
+    " Get functions
+    let a:db.functions.list = db#adapter#call(a:db.conn, 'functions', [a:db.conn], [])
+    call self.populate_routine_items(a:db.functions)
+    
+    " Get events
+    let a:db.events.list = db#adapter#call(a:db.conn, 'events', [a:db.conn], [])
+    call self.populate_event_items(a:db.events)
   endif
 
   call self.populate_table_items(a:db.tables)
   return a:db
+endfunction
+
+function! s:drawer.populate_routine_items(routines) abort
+  for routine in a:routines.list
+    if !has_key(a:routines.items, routine)
+      let a:routines.items[routine] = {'expanded': 0}
+    endif
+  endfor
+endfunction
+
+function! s:drawer.populate_event_items(events) abort
+  for event in a:events.list
+    if !has_key(a:events.items, event)
+      let a:events.items[event] = {'expanded': 0}
+    endif
+  endfor
 endfunction
 
 function! s:drawer.populate_table_items(tables) abort
@@ -739,8 +803,33 @@ function! s:drawer._render_schemas_section(db) abort
       endfor
     endif
   else
+    " Tables
     call self.add('Tables ('.len(a:db.tables.items).')', 'toggle', 'tables', self.get_toggle_icon('tables', a:db.tables), a:db.key_name, 1, { 'expanded': a:db.tables.expanded })
     call self.render_tables(a:db.tables, a:db, 'tables->items', 2, '')
+    
+    " Views
+    if has_key(a:db, 'views')
+      call self.add('Views ('.len(a:db.views.items).')', 'toggle', 'views', self.get_toggle_icon('views', a:db.views), a:db.key_name, 1, { 'expanded': a:db.views.expanded })
+      call self.render_tables(a:db.views, a:db, 'views->items', 2, '')
+    endif
+    
+    " Procedures
+    if has_key(a:db, 'procedures')
+      call self.add('Procedures ('.len(a:db.procedures.items).')', 'toggle', 'procedures', self.get_toggle_icon('procedures', a:db.procedures), a:db.key_name, 1, { 'expanded': a:db.procedures.expanded })
+      call self.render_routines(a:db.procedures, a:db, 'procedures->items', 2, 'PROCEDURE')
+    endif
+    
+    " Functions
+    if has_key(a:db, 'functions')
+      call self.add('Functions ('.len(a:db.functions.items).')', 'toggle', 'functions', self.get_toggle_icon('functions', a:db.functions), a:db.key_name, 1, { 'expanded': a:db.functions.expanded })
+      call self.render_routines(a:db.functions, a:db, 'functions->items', 2, 'FUNCTION')
+    endif
+    
+    " Events
+    if has_key(a:db, 'events')
+      call self.add('Events ('.len(a:db.events.items).')', 'toggle', 'events', self.get_toggle_icon('events', a:db.events), a:db.key_name, 1, { 'expanded': a:db.events.expanded })
+      call self.render_events(a:db.events, a:db, 'events->items', 2)
+    endif
   endif
 endfunction
 
