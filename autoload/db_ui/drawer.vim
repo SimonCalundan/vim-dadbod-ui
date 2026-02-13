@@ -471,8 +471,9 @@ function! s:drawer.render_events(events, db, path, level) abort
   if !a:events.expanded
     return
   endif
+  let event_icon = get(g:db_ui_icons, 'events', get(g:db_ui_icons, 'tables', ''))
   for event in a:events.list
-    call self.add(event, 'open', a:path.'->'.event, g:db_ui_icons.events, a:db.key_name, a:level, {'event': event})
+    call self.add(event, 'open', a:path.'->'.event, event_icon, a:db.key_name, a:level, {'event': event})
   endfor
 endfunction
 
@@ -726,11 +727,13 @@ function! s:drawer.populate_schemas(db) abort
 endfunction
 
 function! s:drawer.get_toggle_icon(type, item) abort
-  if a:item.expanded
-    return g:db_ui_icons.expanded[a:type]
+  let branch = a:item.expanded ? 'expanded' : 'collapsed'
+  let icons = get(g:db_ui_icons, branch, {})
+  let fallback = get(icons, 'tables', '')
+  if has_key(icons, a:type)
+    return icons[a:type]
   endif
-
-  return g:db_ui_icons.collapsed[a:type]
+  return fallback
 endfunction
 
 function! s:drawer.get_nested(obj, val, ...) abort
